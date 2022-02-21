@@ -1,0 +1,915 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Sep  9 05:48:00 2020
+
+@author: som
+"""
+
+# Imports
+import numpy as np
+np.random.seed(100)
+from tensorflow import random
+random.set_seed(100)
+from IPython.display import display
+import pickle
+
+import os
+import pathlib
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
+os.chdir('/Users/som/Dropbox/Complex_systems_RNN/DL_tutorial')
+from Kij import Kij
+from scipy.stats import beta
+from scipy.interpolate import interp1d
+from scipy.stats import uniform
+from scipy.stats import expon
+from statsmodels.distributions.empirical_distribution import ECDF
+
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers
+from tensorflow.keras import regularizers
+print(tf.__version__)
+import tensorflow_docs as tfdocs
+import tensorflow_docs.plots
+import tensorflow_docs.modeling
+
+
+# Import P11 dataset EQ
+
+dataset_path = '/Users/som/Dropbox/Complex_systems_RNN/Data/Multihazards/Eq_P11_10IM.csv'
+dataset = pd.read_csv(dataset_path)
+dataset.pop("IM")
+dataset.pop("Time")
+a1 = 1.0
+b1 = 1.0
+loc1 = 0
+sca1 = 1
+
+def transform1(Rec):
+    return np.power((1-Rec),1/1)
+    
+def invtransform1(x):
+    return (1-np.power(x,1))
+
+def transform2(Rec):
+    return np.power((1-Rec),1/1)
+    
+def invtransform2(x):
+    return (1-np.power(x,1))
+    
+dataset['Rec'] = transform1(dataset['Rec'])
+dataset['P1'] = transform1(dataset['P1'])
+dataset['P2'] = transform1(dataset['P2'])
+dataset.tail()
+
+train_dataset = dataset.sample(frac=1.0,random_state=100)
+test_dataset = dataset.drop(train_dataset.index)
+train_stats = train_dataset.describe()
+train_stats.pop("Rec")
+train_stats = train_stats.transpose()
+train_stats
+
+train_labels = train_dataset.pop('Rec')
+test_labels = test_dataset.pop('Rec')
+
+def norm(x):
+  return (x - train_stats['mean']) / train_stats['std']
+normed_train_data = norm(train_dataset)
+normed_test_data = norm(test_dataset)
+
+def build_model():
+          model = keras.Sequential([
+            layers.Dense(6, activation='softmax', input_shape=[len(train_dataset.keys())],bias_initializer='zeros'),
+            # layers.Dense(4, activation='softmax',bias_initializer='zeros'),
+            layers.Dense(1,bias_initializer='zeros')
+          ])
+        
+          # optimizer = tf.keras.optimizers.RMSprop(0.001)
+          optimizer = tf.keras.optimizers.RMSprop(0.001)
+        
+          model.compile(loss='mse',
+                        optimizer=optimizer,
+                        metrics=['mae', 'mse'])
+          return model
+
+model_p11 = build_model()
+
+
+EPOCHS = 1000
+
+history = model_p11.fit(
+  normed_train_data, train_labels,
+  epochs=EPOCHS, validation_split = 0.0, verbose=0,
+  callbacks=[tfdocs.modeling.EpochDots()],shuffle = False)
+
+hist = pd.DataFrame(history.history)
+hist['epoch'] = history.epoch
+hist.tail()
+
+T_int = 150
+IMe_req = 0.75
+IMh_req = 65
+Tim1 = np.arange(1,(int(np.round(T_int))+1),1)
+Tim2 = np.arange(1,(2000-(int(np.round(T_int))-1)),1)
+Tim = np.arange(1,(2000+1),1)
+Tim3 = np.arange(1,(2000+1),1)
+            
+dat1 = pd.DataFrame(Tim,columns=['Time'])
+Dis_tim1 = Kij(IM=IMe_req,Haz='Eq',time=dat1['Time'])
+A1,A2 = Dis_tim1.Time()
+dat1['P1'] = A1.reshape(len(dat1['Time']),1)
+dat1['P2'] = A2.reshape(len(dat1['Time']),1)
+dat1['P1'] = transform1(dat1['P1'])
+dat1['P2'] = transform1(dat1['P2'])
+dat1.pop("Time")
+normed_dat1 = norm(dat1)
+dat_pred_p11 = invtransform1(model_p11.predict(normed_dat1).flatten())
+dat_pred_p11 = 1-dat_pred_p11[int(np.round(T_int)):2000]
+dat_pred_p11[np.where(dat_pred_p11>1)]=1
+dat_pred_p11[0] = 0
+            
+# Import P22 dataset EQ
+
+dataset_path = '/Users/som/Dropbox/Complex_systems_RNN/Data/Multihazards/Eq_P22_10IM.csv'
+dataset = pd.read_csv(dataset_path)
+dataset.pop("IM")
+dataset.pop("Time")
+a1 = 1.0
+b1 = 1.0
+loc1 = 0
+sca1 = 1
+    
+dataset['Rec'] = transform1(dataset['Rec'])
+dataset['P1'] = transform1(dataset['P1'])
+dataset['P2'] = transform1(dataset['P2'])
+dataset.tail()
+
+train_dataset = dataset.sample(frac=1.0,random_state=100)
+test_dataset = dataset.drop(train_dataset.index)
+train_stats = train_dataset.describe()
+train_stats.pop("Rec")
+train_stats = train_stats.transpose()
+train_stats
+
+train_labels = train_dataset.pop('Rec')
+test_labels = test_dataset.pop('Rec')
+
+def norm(x):
+  return (x - train_stats['mean']) / train_stats['std']
+normed_train_data = norm(train_dataset)
+normed_test_data = norm(test_dataset)
+
+
+model_p22 = build_model()
+
+
+EPOCHS = 1000
+
+history = model_p22.fit(
+  normed_train_data, train_labels,
+  epochs=EPOCHS, validation_split = 0.0, verbose=0,
+  callbacks=[tfdocs.modeling.EpochDots()],shuffle = False)
+
+hist = pd.DataFrame(history.history)
+hist['epoch'] = history.epoch
+hist.tail()
+
+dat2 = pd.DataFrame(Tim,columns=['Time'])
+Dis_tim2 = Kij(IM=IMe_req,Haz='Eq',time=dat2['Time'])
+A1,A2 = Dis_tim2.Time()
+dat2['P1'] = A1.reshape(len(dat2['Time']),1)
+dat2['P2'] = A2.reshape(len(dat2['Time']),1)
+dat2['P1'] = transform1(dat2['P1'])
+dat2['P2'] = transform1(dat2['P2'])
+dat2.pop("Time")
+normed_dat2 = norm(dat2)
+dat_pred_p22 = invtransform1(model_p22.predict(normed_dat2).flatten())
+dat_pred_p22 = 1-dat_pred_p22[int(np.round(T_int)):2000]
+dat_pred_p22[np.where(dat_pred_p22>1)]=1
+dat_pred_p22[0] = 0
+            
+# Train SH recovery
+
+# dataset_path = '/Users/som/Dropbox/Complex_systems_RNN/Data/New data for improved disf match/Hurr_10IM.csv'
+dataset_path = '/Users/som/Dropbox/Complex_systems_RNN/Data/New data for improved disf match/Eq_10IM.csv'
+dataset = pd.read_csv(dataset_path)
+dataset.pop("IM")
+dataset.pop("Time")
+a1 = 1.0
+b1 = 1.0
+loc1 = 0
+sca1 = 1
+    
+dataset['Rec'] = transform2(dataset['Rec'])
+dataset['P1'] = transform2(dataset['P1'])
+dataset['P2'] = transform2(dataset['P2'])
+dataset.tail()
+
+train_dataset = dataset.sample(frac=1.0,random_state=100)
+test_dataset = dataset.drop(train_dataset.index)
+train_stats = train_dataset.describe()
+train_stats.pop("Rec")
+train_stats = train_stats.transpose()
+train_stats
+
+train_labels = train_dataset.pop('Rec')
+test_labels = test_dataset.pop('Rec')
+
+def norm(x):
+  return (x - train_stats['mean']) / train_stats['std']
+normed_train_data = norm(train_dataset)
+normed_test_data = norm(test_dataset)
+
+def build_model_SH():
+          model = keras.Sequential([
+            layers.Dense(6, activation='softmax', input_shape=[len(train_dataset.keys())],bias_initializer='zeros'),
+            # layers.Dense(4, activation='softmax',bias_initializer='zeros'),
+            layers.Dense(1,bias_initializer='zeros')
+          ])
+        
+          # optimizer = tf.keras.optimizers.RMSprop(0.001)
+          optimizer = tf.keras.optimizers.RMSprop(0.001)
+        
+          model.compile(loss='mse',
+                        optimizer=optimizer,
+                        metrics=['mae', 'mse'])
+          return model
+
+model_SH = build_model_SH()
+
+EPOCHS = 3000
+
+history = model_SH.fit(
+  normed_train_data, train_labels,
+  epochs=EPOCHS, validation_split = 0.0, verbose=0,
+  callbacks=[tfdocs.modeling.EpochDots()],shuffle = False)
+
+hist = pd.DataFrame(history.history)
+hist['epoch'] = history.epoch
+hist.tail()
+
+dat = []
+Tim1 = np.arange(1,(int(np.round(T_int))+1),1)
+dat = pd.DataFrame(Tim1,columns=['Time'])
+Dis_tim = Kij(IM=IMe_req,Haz='Eq',time=dat['Time'])
+A1,A2 = Dis_tim.Time()
+dat['P1'] = A1.reshape(len(dat['Time']),1)
+dat['P2'] = A2.reshape(len(dat['Time']),1)
+dat['P1'] = transform2(dat['P1'])
+dat['P2'] = transform2(dat['P2'])
+dat.pop("Time")
+normed_dat = norm(dat)
+dat_pred1 = invtransform2(model_SH.predict(normed_dat).flatten())
+
+## Train MH recovery
+
+dataset_path = '/Users/som/Dropbox/Complex_systems_RNN/Data/New data for improved disf match/MH_EH_10IM.csv'
+dataset = pd.read_csv(dataset_path)
+dataset.pop("IMe")
+dataset.pop("IMh")
+dataset.pop("Tint")
+dataset.pop("Time")
+a1 = 1.0
+b1 = 1.0
+loc1 = 0
+sca1 = 1
+
+dataset['Rec'] = transform2(dataset['Rec'])
+dataset['P1'] = transform2(dataset['P1'])
+dataset['P2'] = transform2(dataset['P2'])
+dataset.tail()
+
+train_dataset = dataset.sample(frac=1.0,random_state=100)
+test_dataset = dataset.drop(train_dataset.index)
+train_stats = train_dataset.describe()
+train_stats.pop("Rec")
+train_stats = train_stats.transpose()
+train_stats
+
+train_labels = train_dataset.pop('Rec')
+test_labels = test_dataset.pop('Rec')
+
+def norm(x):
+  return (x - train_stats['mean']) / train_stats['std']
+normed_train_data = norm(train_dataset)
+normed_test_data = norm(test_dataset)
+
+def build_model_MH():
+          model = keras.Sequential([
+            layers.Dense(6, activation='softmax', input_shape=[len(train_dataset.keys())],bias_initializer='zeros'),
+            # layers.Dense(4, activation='softmax',bias_initializer='zeros'),
+            layers.Dense(1,bias_initializer='zeros')
+          ])
+        
+          # optimizer = tf.keras.optimizers.RMSprop(0.001)
+          optimizer = tf.keras.optimizers.RMSprop(0.001)
+        
+          model.compile(loss='mse',
+                        optimizer=optimizer,
+                        metrics=['mae', 'mse'])
+          return model
+      
+model_MH = build_model_MH()
+
+EPOCHS = 3000
+
+history = model_MH.fit(
+  normed_train_data, train_labels,
+  epochs=EPOCHS, validation_split = 0.0, verbose=0,
+  callbacks=[tfdocs.modeling.EpochDots()],shuffle = False)
+
+hist = pd.DataFrame(history.history)
+hist['epoch'] = history.epoch
+hist.tail()
+
+
+Dis_tim3 = Kij(IM=IMh_req,Haz='Hurr',time=Tim3)
+A1,A2 = Dis_tim3.Time()
+A1[0] = 0
+A2[0] = 0
+A1[len(A1)-1] = 1
+A2[len(A2)-1] = 1
+
+N_sims = 10000
+
+rv1 = uniform()
+p1,p2 = np.unique(dat_pred_p11,return_index=True)
+p11_f = interp1d(p1,Tim2[p2],kind='linear')
+p11_times = p11_f(rv1.rvs(N_sims))
+rv2 = uniform()
+p1,p2 = np.unique(A1,return_index=True)
+k12_f = interp1d(p1,Tim3[p2])
+k12_times = k12_f(rv2.rvs(N_sims))
+ecdf_k12 = ECDF(p11_times+k12_times) # p11_times+
+
+rv3 = uniform()
+p1,p2 = np.unique(dat_pred_p22,return_index=True)
+p22_f = interp1d(p1,Tim2[p2])
+p22_times = p22_f(rv3.rvs(N_sims))
+rv4 = uniform()
+p1,p2 = np.unique(A2,return_index=True)
+k23_f = interp1d(p1,Tim3[p2])
+k23_times = k23_f(rv4.rvs(N_sims))
+ecdf_k23 = ECDF(p22_times+k23_times) # p22_times+
+
+dat_MH = pd.DataFrame(Tim2,columns=['Time'])
+K = ecdf_k12(Tim2)
+dat_MH['P1'] = K.reshape(len(Tim2),1)
+K = ecdf_k23(Tim2)
+dat_MH['P2'] = K.reshape(len(Tim2),1)
+dat_MH['P1'] = transform2(dat_MH['P1'])
+dat_MH['P2'] = transform2(dat_MH['P2'])
+dat_MH.pop("Time")
+normed_dat_MH = norm(dat_MH)
+dat_pred_MH = invtransform2(model_MH.predict(normed_dat_MH).flatten())
+
+req = np.concatenate((dat_pred1, dat_pred_MH), axis=0)
+
+
+
+
+
+
+
+## Predict one MH recovery curve
+
+dat = []
+
+IMe = [0.95]
+IMh = [85]
+T_int = 350
+N_int = 1
+N_sims = 10000
+
+fin_rec = np.zeros((2000,len(IMe),len(IMh)))
+count = 0
+
+for ii in np.arange(0,len(IMe),1):
+    for jj in np.arange(0,len(IMh),1):
+        IMe_req = IMe[ii]
+        IMh_req = IMh[jj]
+        rec_avg_tint = np.zeros((1,2000))
+        for kk in np.arange(0,N_int,1):
+            # T_int = rv_tint.rvs()+1
+            if T_int>2000:T_int=1900.0
+            
+            Tim1 = np.arange(1,(int(np.round(T_int))+1),1)
+            Tim2 = np.arange(1,(2000-(int(np.round(T_int))-1)),1)
+            Tim = np.arange(1,(2000+1),1)
+            Tim3 = np.arange(1,(2000+1),1)
+            
+            dat = pd.DataFrame(Tim1,columns=['Time'])
+            Dis_tim = Kij(IM=IMe_req,Haz='Eq',time=dat['Time'])
+            A1,A2 = Dis_tim.Time()
+            dat['P1'] = A1.reshape(len(dat['Time']),1)
+            dat['P2'] = A2.reshape(len(dat['Time']),1)
+            dat['P1'] = transform2(dat['P1'])
+            dat['P2'] = transform2(dat['P2'])
+            dat.pop("Time")
+            normed_dat = norm(dat)
+            dat_pred1 = invtransform2(model_SH.predict(normed_dat).flatten())
+            
+            dat1 = pd.DataFrame(Tim,columns=['Time'])
+            Dis_tim1 = Kij(IM=IMe_req,Haz='Eq',time=dat1['Time'])
+            A1,A2 = Dis_tim1.Time()
+            dat1['P1'] = A1.reshape(len(dat1['Time']),1)
+            dat1['P2'] = A2.reshape(len(dat1['Time']),1)
+            dat1['P1'] = transform1(dat1['P1'])
+            dat1['P2'] = transform1(dat1['P2'])
+            dat1.pop("Time")
+            normed_dat1 = norm(dat1)
+            dat_pred_p11 = invtransform1(model_p11.predict(normed_dat1).flatten())
+            dat_pred_p11 = 1-dat_pred_p11[int(np.round(T_int)):2000]
+            dat_pred_p11[np.where(dat_pred_p11>1)]=1
+            dat_pred_p11[0] = 0
+            
+            dat2 = pd.DataFrame(Tim,columns=['Time'])
+            Dis_tim2 = Kij(IM=IMe_req,Haz='Eq',time=dat2['Time'])
+            A1,A2 = Dis_tim2.Time()
+            dat2['P1'] = A1.reshape(len(dat2['Time']),1)
+            dat2['P2'] = A2.reshape(len(dat2['Time']),1)
+            dat2['P1'] = transform1(dat2['P1'])
+            dat2['P2'] = transform1(dat2['P2'])
+            dat2.pop("Time")
+            normed_dat2 = norm(dat2)
+            dat_pred_p22 = invtransform1(model_p22.predict(normed_dat2).flatten())
+            dat_pred_p22 = 1-dat_pred_p22[int(np.round(T_int)):2000]
+            dat_pred_p22[np.where(dat_pred_p22>1)]=1
+            dat_pred_p22[0] = 0
+            
+            Dis_tim3 = Kij(IM=IMh_req,Haz='Hurr',time=Tim3)
+            A1,A2 = Dis_tim3.Time()
+            A1[0] = 0
+            A2[0] = 0
+            A1[len(A1)-1] = 1
+            A2[len(A2)-1] = 1
+            
+            rv1 = uniform()
+            p1,p2 = np.unique(dat_pred_p11,return_index=True)
+            p11_f = interp1d(p1,Tim2[p2],kind='linear')
+            p11_times = p11_f(rv1.rvs(N_sims))
+            rv2 = uniform()
+            p1,p2 = np.unique(A1,return_index=True)
+            k12_f = interp1d(p1,Tim3[p2])
+            k12_times = k12_f(rv2.rvs(N_sims))
+            ecdf_k12 = ECDF(p11_times+k12_times) # p11_times+
+            
+            rv3 = uniform()
+            p1,p2 = np.unique(dat_pred_p22,return_index=True)
+            p22_f = interp1d(p1,Tim2[p2])
+            p22_times = p22_f(rv3.rvs(N_sims))
+            rv4 = uniform()
+            p1,p2 = np.unique(A2,return_index=True)
+            k23_f = interp1d(p1,Tim3[p2])
+            k23_times = k23_f(rv4.rvs(N_sims))
+            ecdf_k23 = ECDF(p22_times+k23_times) # p22_times+
+            
+            dat_MH = pd.DataFrame(Tim2,columns=['Time'])
+            K = ecdf_k12(Tim2)
+            dat_MH['P1'] = K.reshape(len(Tim2),1)
+            K = ecdf_k23(Tim2)
+            dat_MH['P2'] = K.reshape(len(Tim2),1)
+            dat_MH['P1'] = transform2(dat_MH['P1'])
+            dat_MH['P2'] = transform2(dat_MH['P2'])
+            dat_MH.pop("Time")
+            normed_dat_MH = norm(dat_MH)
+            dat_pred_MH = invtransform2(model_MH.predict(normed_dat_MH).flatten())
+            
+            rec_avg_tint = rec_avg_tint +  np.concatenate((dat_pred1, dat_pred_MH), axis=0)
+            
+        rec_avg_tint = rec_avg_tint/N_int
+        fin_rec[:,ii,jj] = rec_avg_tint[0]
+        count = count + 1
+        display(count/(len(IMe)*len(IMh)))
+        
+K = rec_avg_tint[0]
+
+
+# # dataset_path = '/Users/som/Dropbox/Complex_systems_RNN/Data/New data for improved disf match/Hurr_10IM.csv'
+# dataset_path = '/Users/som/Dropbox/Complex_systems_RNN/Data/Multihazards/MH_10IM.csv'
+# dataset = pd.read_csv(dataset_path)
+# dataset.pop("IM")
+# dataset.pop("Time")
+# a1 = 1.0
+# b1 = 1.0
+# loc1 = 0
+# sca1 = 1
+    
+# dataset['Rec'] = transform2(dataset['Rec'])
+# dataset['P1'] = transform2(dataset['P1'])
+# dataset['P2'] = transform2(dataset['P2'])
+# dataset.tail()
+
+# train_dataset = dataset.sample(frac=1.0,random_state=100)
+# test_dataset = dataset.drop(train_dataset.index)
+# train_stats = train_dataset.describe()
+# train_stats.pop("Rec")
+# train_stats = train_stats.transpose()
+# train_stats
+
+# train_labels = train_dataset.pop('Rec')
+# test_labels = test_dataset.pop('Rec')
+
+# def norm(x):
+#   return (x - train_stats['mean']) / train_stats['std']
+# normed_train_data = norm(train_dataset)
+# normed_test_data = norm(test_dataset)
+
+# model_MH = build_model()
+
+# EPOCHS = 3000
+
+# history = model_MH.fit(
+#   normed_train_data, train_labels,
+#   epochs=EPOCHS, validation_split = 0.0, verbose=0,
+#   callbacks=[tfdocs.modeling.EpochDots()],shuffle = False)
+
+# hist = pd.DataFrame(history.history)
+# hist['epoch'] = history.epoch
+# hist.tail()
+
+# ## Predict one MH recovery curve
+
+# IMe = [0.85]
+# IMh = [105]
+# T_int = 250
+# N_int = 1
+# N_sims = 10000
+
+# fin_rec = np.zeros((2000,len(IMe),len(IMh)))
+# count = 0
+# for ii in np.arange(0,len(IMe),1):
+#     for jj in np.arange(0,len(IMh),1):
+#         IMe_req = IMe[ii]
+#         IMh_req = IMh[jj]
+#         rec_avg_tint = np.zeros((1,2000))
+#         for kk in np.arange(0,N_int,1):
+#             # T_int = rv_tint.rvs()+1
+#             if T_int>2000:T_int=1900.0
+            
+#             Tim1 = np.arange(1,(int(np.round(T_int))+1),1)
+#             Tim2 = np.arange(1,(2000-(int(np.round(T_int))-1)),1)
+#             Tim = np.arange(1,(2000+1),1)
+#             Tim3 = np.arange(1,(2000+1),1)
+            
+#             dat = pd.DataFrame(Tim1,columns=['Time'])
+#             Dis_tim = Kij(IM=IMe_req,Haz='Eq',time=dat['Time'])
+#             A1,A2 = Dis_tim.Time()
+#             dat['P1'] = A1.reshape(len(dat['Time']),1)
+#             dat['P2'] = A2.reshape(len(dat['Time']),1)
+#             dat['P1'] = transform2(dat['P1'])
+#             dat['P2'] = transform2(dat['P2'])
+#             dat.pop("Time")
+#             normed_dat = norm(dat)
+#             dat_pred1 = invtransform2(model_MH.predict(normed_dat).flatten())
+            
+#             dat1 = pd.DataFrame(Tim,columns=['Time'])
+#             Dis_tim1 = Kij(IM=IMe_req,Haz='Eq',time=dat1['Time'])
+#             A1,A2 = Dis_tim1.Time()
+#             dat1['P1'] = A1.reshape(len(dat1['Time']),1)
+#             dat1['P2'] = A2.reshape(len(dat1['Time']),1)
+#             dat1['P1'] = transform1(dat1['P1'])
+#             dat1['P2'] = transform1(dat1['P2'])
+#             dat1.pop("Time")
+#             normed_dat1 = norm(dat1)
+#             dat_pred_p11 = invtransform1(model_p11.predict(normed_dat1).flatten())
+#             dat_pred_p11 = 1-dat_pred_p11[int(np.round(T_int)):2000]
+#             dat_pred_p11[np.where(dat_pred_p11>1)]=1
+#             dat_pred_p11[0] = 0
+            
+#             dat2 = pd.DataFrame(Tim,columns=['Time'])
+#             Dis_tim2 = Kij(IM=IMe_req,Haz='Eq',time=dat2['Time'])
+#             A1,A2 = Dis_tim2.Time()
+#             dat2['P1'] = A1.reshape(len(dat2['Time']),1)
+#             dat2['P2'] = A2.reshape(len(dat2['Time']),1)
+#             dat2['P1'] = transform1(dat2['P1'])
+#             dat2['P2'] = transform1(dat2['P2'])
+#             dat2.pop("Time")
+#             normed_dat2 = norm(dat2)
+#             dat_pred_p22 = invtransform1(model_p22.predict(normed_dat2).flatten())
+#             dat_pred_p22 = 1-dat_pred_p22[int(np.round(T_int)):2000]
+#             dat_pred_p22[np.where(dat_pred_p22>1)]=1
+#             dat_pred_p22[0] = 0
+            
+#             Dis_tim3 = Kij(IM=IMh_req,Haz='Hurr',time=Tim3)
+#             A1,A2 = Dis_tim3.Time()
+#             A1[0] = 0
+#             A2[0] = 0
+#             A1[len(A1)-1] = 1
+#             A2[len(A2)-1] = 1
+            
+#             rv1 = uniform()
+#             p1,p2 = np.unique(dat_pred_p11,return_index=True)
+#             p11_f = interp1d(p1,Tim2[p2],kind='linear')
+#             p11_times = p11_f(rv1.rvs(N_sims))
+#             rv2 = uniform()
+#             p1,p2 = np.unique(A1,return_index=True)
+#             k12_f = interp1d(p1,Tim3[p2])
+#             k12_times = k12_f(rv2.rvs(N_sims))
+#             ecdf_k12 = ECDF(p11_times+k12_times) # p11_times+
+            
+#             rv3 = uniform()
+#             p1,p2 = np.unique(dat_pred_p22,return_index=True)
+#             p22_f = interp1d(p1,Tim2[p2])
+#             p22_times = p22_f(rv3.rvs(N_sims))
+#             rv4 = uniform()
+#             p1,p2 = np.unique(A2,return_index=True)
+#             k23_f = interp1d(p1,Tim3[p2])
+#             k23_times = k23_f(rv4.rvs(N_sims))
+#             ecdf_k23 = ECDF(p22_times+k23_times) # p22_times+
+            
+#             dat_MH = pd.DataFrame(Tim2,columns=['Time'])
+#             K = ecdf_k12(Tim2)
+#             dat_MH['P1'] = K.reshape(len(Tim2),1)
+#             K = ecdf_k23(Tim2)
+#             dat_MH['P2'] = K.reshape(len(Tim2),1)
+#             dat_MH['P1'] = transform2(dat_MH['P1'])
+#             dat_MH['P2'] = transform2(dat_MH['P2'])
+#             dat_MH.pop("Time")
+#             normed_dat_MH = norm(dat_MH)
+#             dat_pred_MH = invtransform2(model_MH.predict(normed_dat_MH).flatten())
+            
+#             rec_avg_tint = rec_avg_tint +  np.concatenate((dat_pred1, dat_pred_MH), axis=0)
+            
+#         rec_avg_tint = rec_avg_tint/N_int
+#         fin_rec[:,ii,jj] = rec_avg_tint[0]
+#         count = count + 1
+#         display(count/(len(IMe)*len(IMh)))
+        
+# K = rec_avg_tint[0]
+
+
+# Multihazard disfunctionality hazard (EQ first scenario)
+
+# Tim1 = np.arange(1,151,1)
+# Tim2 = np.arange(1,(1000-149),1)
+# Tim = np.arange(1,(1000+1),1)
+# Tim3 = np.arange(1,(2000+1),1)
+# IMe = np.arange(0.01,2.01,0.05) # np.array([0.85,1.25]) # 
+# IMh = np.arange(10,126,5) # np.array([70,100]) # 
+# N_int = 600
+# rv_tint = expon(loc=0,scale=150)
+
+# fin_rec = np.zeros((2000,len(IMe),len(IMh)))
+# count = 0
+# for ii in np.arange(0,len(IMe),1):
+#     for jj in np.arange(0,len(IMh),1):
+#         IMe_req = IMe[ii]
+#         IMh_req = IMh[jj]
+#         rec_avg_tint = np.zeros((1,2000))
+#         for kk in np.arange(0,N_int,1):
+#             T_int = rv_tint.rvs()+1
+#             if T_int>2000:T_int=1900.0
+            
+#             Tim1 = np.arange(1,(int(np.round(T_int))+1),1)
+#             Tim2 = np.arange(1,(2000-(int(np.round(T_int))-1)),1)
+#             Tim = np.arange(1,(2000+1),1)
+#             Tim3 = np.arange(1,(2000+1),1)
+            
+#             dat = pd.DataFrame(Tim1,columns=['Time'])
+#             Dis_tim = Kij(IM=IMe_req,Haz='Eq',time=dat['Time'])
+#             A1,A2 = Dis_tim.Time()
+#             dat['P1'] = A1.reshape(len(dat['Time']),1)
+#             dat['P2'] = A2.reshape(len(dat['Time']),1)
+#             dat['P1'] = transform(dat['P1'])
+#             dat['P2'] = transform(dat['P2'])
+#             dat.pop("Time")
+#             normed_dat = norm(dat)
+#             dat_pred1 = invtransform(model_MH.predict(normed_dat).flatten())
+            
+#             dat1 = pd.DataFrame(Tim,columns=['Time'])
+#             Dis_tim1 = Kij(IM=IMe_req,Haz='Eq',time=dat1['Time'])
+#             A1,A2 = Dis_tim1.Time()
+#             dat1['P1'] = A1.reshape(len(dat1['Time']),1)
+#             dat1['P2'] = A2.reshape(len(dat1['Time']),1)
+#             dat1['P1'] = transform1(dat1['P1'])
+#             dat1['P2'] = transform1(dat1['P2'])
+#             dat1.pop("Time")
+#             normed_dat1 = norm(dat1)
+#             dat_pred_p11 = invtransform1(model_p11.predict(normed_dat1).flatten())
+#             dat_pred_p11 = 1-dat_pred_p11[int(np.round(T_int)):2000]
+#             dat_pred_p11[np.where(dat_pred_p11>1)]=1
+#             dat_pred_p11[0] = 0
+            
+#             dat2 = pd.DataFrame(Tim,columns=['Time'])
+#             Dis_tim2 = Kij(IM=IMe_req,Haz='Eq',time=dat2['Time'])
+#             A1,A2 = Dis_tim2.Time()
+#             dat2['P1'] = A1.reshape(len(dat2['Time']),1)
+#             dat2['P2'] = A2.reshape(len(dat2['Time']),1)
+#             dat2['P1'] = transform1(dat2['P1'])
+#             dat2['P2'] = transform1(dat2['P2'])
+#             dat2.pop("Time")
+#             normed_dat2 = norm(dat2)
+#             dat_pred_p22 = invtransform1(model_p22.predict(normed_dat2).flatten())
+#             dat_pred_p22 = 1-dat_pred_p22[int(np.round(T_int)):2000]
+#             dat_pred_p22[np.where(dat_pred_p22>1)]=1
+#             dat_pred_p22[0] = 0
+            
+#             Dis_tim3 = Kij(IM=IMh_req,Haz='Hurr',time=Tim3)
+#             A1,A2 = Dis_tim3.Time()
+#             A1[0] = 0
+#             A2[0] = 0
+#             A1[len(A1)-1] = 1
+#             A2[len(A2)-1] = 1
+            
+#             rv1 = uniform()
+#             p1,p2 = np.unique(dat_pred_p11,return_index=True)
+#             p11_f = interp1d(p1,Tim2[p2],kind='linear')
+#             p11_times = p11_f(rv1.rvs(1000))
+#             rv2 = uniform()
+#             p1,p2 = np.unique(A1,return_index=True)
+#             k12_f = interp1d(p1,Tim3[p2])
+#             k12_times = k12_f(rv2.rvs(1000))
+#             ecdf_k12 = ECDF(p11_times+k12_times) # p11_times+
+            
+#             rv3 = uniform()
+#             p1,p2 = np.unique(dat_pred_p22,return_index=True)
+#             p22_f = interp1d(p1,Tim2[p2])
+#             p22_times = p22_f(rv3.rvs(1000))
+#             rv4 = uniform()
+#             p1,p2 = np.unique(A2,return_index=True)
+#             k23_f = interp1d(p1,Tim3[p2])
+#             k23_times = k23_f(rv4.rvs(1000))
+#             ecdf_k23 = ECDF(p22_times+k23_times) # p22_times+
+            
+#             dat_MH = pd.DataFrame(Tim2,columns=['Time'])
+#             K = ecdf_k12(Tim2)
+#             dat_MH['P1'] = K.reshape(len(Tim2),1)
+#             K = ecdf_k23(Tim2)
+#             dat_MH['P2'] = K.reshape(len(Tim2),1)
+#             dat_MH['P1'] = transform(dat_MH['P1'])
+#             dat_MH['P2'] = transform(dat_MH['P2'])
+#             dat_MH.pop("Time")
+#             normed_dat_MH = norm(dat_MH)
+#             dat_pred_MH = invtransform(model_MH.predict(normed_dat_MH).flatten())
+            
+#             rec_avg_tint = rec_avg_tint +  np.concatenate((dat_pred1, dat_pred_MH), axis=0)
+            
+#         rec_avg_tint = rec_avg_tint/N_int
+#         fin_rec[:,ii,jj] = rec_avg_tint[0]
+#         count = count + 1
+#         display(count/(len(IMe)*len(IMh)))
+        
+        
+# with open('/Users/som/Dropbox/Complex_systems_RNN/Data/Multihazards/MH_EF_HN_Frag.pickle', 'wb') as f:
+#     pickle.dump(fin_rec, f)
+
+# with open('/Users/som/Dropbox/Complex_systems_RNN/Data/Multihazards/MH_EF_HN_Time.pickle', 'wb') as f:
+#     pickle.dump(Tim, f)
+    
+    
+# with open('/Users/som/Dropbox/Complex_systems_RNN/Data/Multihazards/MH_EF_HN_IMe.pickle', 'wb') as f:
+#     pickle.dump(IMe, f)
+    
+# with open('/Users/som/Dropbox/Complex_systems_RNN/Data/Multihazards/MH_EF_HN_IMh.pickle', 'wb') as f:
+#     pickle.dump(IMh, f)
+
+
+# fin_rec = pickle.load( open( '/Users/som/Dropbox/Complex_systems_RNN/Data/Multihazards/MH_EF_HN_Frag.pickle', "rb" ) )
+# Tim = pickle.load( open( '/Users/som/Dropbox/Complex_systems_RNN/Data/Multihazards/MH_EF_HN_Time.pickle', "rb" ) )
+# IMe = pickle.load( open( '/Users/som/Dropbox/Complex_systems_RNN/Data/Multihazards/MH_EF_HN_IMe.pickle', "rb" ) )
+# IMh = pickle.load( open( '/Users/som/Dropbox/Complex_systems_RNN/Data/Multihazards/MH_EF_HN_IMh.pickle', "rb" ) )
+
+# dat_haz = '/Users/som/Dropbox/Complex_systems_RNN/Data/Eq_Haz.csv'
+# dat_haz = pd.read_csv(dat_haz)
+# IMe_pred = interp1d(dat_haz['IM'],dat_haz['Haz_diff'],kind='linear')
+# IMe_haz = IMe_pred(IMe)
+# IMe_haz = IMe_haz/np.abs(np.trapz(IMe,IMe_haz))
+
+# dat_haz = '/Users/som/Dropbox/Complex_systems_RNN/Data/New data for improved disf match/Hurr_Haz.csv'
+# dat_haz = pd.read_csv(dat_haz)
+# IMh_pred = interp1d(dat_haz['IM'],dat_haz['Haz_diff'],kind='linear')
+# IMh_haz = IMh_pred(IMh)
+# IMh_haz = IMh_haz/np.abs(np.trapz(IMh,IMh_haz))
+
+# Disf = np.zeros((len(Tim),1))
+# tmp = np.zeros(len(IMh))
+# for ii in np.arange(0,len(Tim),1):
+#     for jj in np.arange(0,len(IMh),1):
+#         tmp[jj] = np.trapz(IMe_haz*(1-fin_rec[ii,:,jj]),IMe)
+#     Disf[ii] = np.trapz(IMh_haz*tmp,IMh)
+    
+
+# plt.loglog(Tim, Disf)
+# plt.xlim([10, 1000])
+
+# file_MH = '/Users/som/Dropbox/Complex_systems_RNN/Data/Multihazards/MH_exact_EH_125_70_150_avg.csv'
+# MH_exact = pd.read_csv(file_MH)
+# plt.plot(MH_exact['Time'],MH_exact['Rec'],label='Exact')
+# plt.plot(Tim,rec_avg_tint[0],label='DNN')
+# plt.ylim([0,1.0])
+# plt.xlim([0,1000.0])
+# plt.legend()
+
+# Make Pii predictions
+
+# IMe = np.array([0.25,0.45,0.75,0.95,1.15,1.4,1.72,1.9]) # (np.arange(0.01,2.01,0.01))
+# IMe.reshape(len(IMe),1)
+# Tim = (np.arange(4,1001,1))
+# Tim.reshape(len(Tim),1)
+
+# Res = np.zeros((len(IMe),len(Tim)))
+
+# for ii in np.arange(0,len(IMe),1):
+#     dat = pd.DataFrame(Tim,columns=['Time'])
+#     Dis_tim = Kij(IM=IMe[ii],Haz='Eq',time=dat['Time'])
+#     A1,A2 = Dis_tim.Time()
+#     dat['P1'] = A1.reshape(len(dat['Time']),1)
+#     dat['P2'] = A2.reshape(len(dat['Time']),1)
+#     dat['P1'] = transform(dat['P1'])
+#     dat['P2'] = transform(dat['P2'])
+#     dat.pop("Time")
+#     normed_dat = norm(dat)
+#     dat_pred = model.predict(normed_dat).flatten()
+#     Res[ii,:] = invtransform(dat_pred)
+
+# path11 = '/Users/som/Dropbox/Complex_systems_RNN/Data/Multihazards/Eq_TPM_0_25.csv'
+# TPM_exact = pd.read_csv(path11)
+# TPM_exact = np.array(TPM_exact)
+# plt.figure(0)
+# plt.plot(TPM_exact[:,0],TPM_exact[:,2],label='Exact')
+# plt.plot(Tim,Res[0,:],label='DNN')
+# plt.ylim([0,1])
+# plt.xlabel('Time [days]')
+# plt.ylabel('TPM component')
+# plt.legend()
+
+# path11 = '/Users/som/Dropbox/Complex_systems_RNN/Data/Multihazards/Eq_TPM_0_45.csv'
+# TPM_exact = pd.read_csv(path11)
+# TPM_exact = np.array(TPM_exact)
+# plt.figure(1)
+# plt.plot(TPM_exact[:,0],TPM_exact[:,2],label='Exact')
+# plt.plot(Tim,Res[1,:],label='DNN')
+# plt.ylim([0,1])
+# plt.xlabel('Time [days]')
+# plt.ylabel('TPM component')
+# plt.legend()
+
+# path11 = '/Users/som/Dropbox/Complex_systems_RNN/Data/Multihazards/Eq_TPM_0_75.csv'
+# TPM_exact = pd.read_csv(path11)
+# TPM_exact = np.array(TPM_exact)
+# plt.figure(2)
+# plt.plot(TPM_exact[:,0],TPM_exact[:,2],label='Exact')
+# plt.plot(Tim,Res[2,:],label='DNN')
+# plt.ylim([0,1])
+# plt.xlabel('Time [days]')
+# plt.ylabel('TPM component')
+# plt.legend()
+
+# path11 = '/Users/som/Dropbox/Complex_systems_RNN/Data/Multihazards/Eq_TPM_0_95.csv'
+# TPM_exact = pd.read_csv(path11)
+# TPM_exact = np.array(TPM_exact)
+# plt.figure(3)
+# plt.plot(TPM_exact[:,0],TPM_exact[:,2],label='Exact')
+# plt.plot(Tim,Res[3,:],label='DNN')
+# plt.ylim([0,1])
+# plt.xlabel('Time [days]')
+# plt.ylabel('TPM component')
+# plt.legend()
+
+# path11 = '/Users/som/Dropbox/Complex_systems_RNN/Data/Multihazards/Eq_TPM_1_15.csv'
+# TPM_exact = pd.read_csv(path11)
+# TPM_exact = np.array(TPM_exact)
+# plt.figure(4)
+# plt.plot(TPM_exact[:,0],TPM_exact[:,2],label='Exact')
+# plt.plot(Tim,Res[4,:],label='DNN')
+# plt.ylim([0,1])
+# plt.xlabel('Time [days]')
+# plt.ylabel('TPM component')
+# plt.legend()
+
+# path11 = '/Users/som/Dropbox/Complex_systems_RNN/Data/Multihazards/Eq_TPM_1_4.csv'
+# TPM_exact = pd.read_csv(path11)
+# TPM_exact = np.array(TPM_exact)
+# plt.figure(5)
+# plt.plot(TPM_exact[:,0],TPM_exact[:,2],label='Exact')
+# plt.plot(Tim,Res[5,:],label='DNN')
+# plt.ylim([0,1])
+# plt.xlabel('Time [days]')
+# plt.ylabel('TPM component')
+# plt.legend()
+
+# path11 = '/Users/som/Dropbox/Complex_systems_RNN/Data/Multihazards/Eq_TPM_1_72.csv'
+# TPM_exact = pd.read_csv(path11)
+# TPM_exact = np.array(TPM_exact)
+# plt.figure(6)
+# plt.plot(TPM_exact[:,0],TPM_exact[:,2],label='Exact')
+# plt.plot(Tim,Res[6,:],label='DNN')
+# plt.ylim([0,1])
+# plt.xlabel('Time [days]')
+# plt.ylabel('TPM component')
+# plt.legend()
+
+# path11 = '/Users/som/Dropbox/Complex_systems_RNN/Data/Multihazards/Eq_TPM_1_9.csv'
+# TPM_exact = pd.read_csv(path11)
+# TPM_exact = np.array(TPM_exact)
+# plt.figure(7)
+# plt.plot(TPM_exact[:,0],TPM_exact[:,2],label='Exact')
+# plt.plot(Tim,Res[7,:],label='DNN')
+# plt.ylim([0,1])
+# plt.xlabel('Time [days]')
+# plt.ylabel('TPM component')
+# plt.legend()
