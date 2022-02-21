@@ -17,7 +17,7 @@ import pathlib
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-os.chdir('/Users/som/Dropbox/Complex_systems_RNN/DL_tutorial')
+os.chdir('/Users/som/Dropbox/Complex_systems_RNN/DL_implementation')
 from Kij import Kij
 from scipy.stats import beta
 
@@ -115,8 +115,8 @@ normed_test_data = norm(test_dataset)
 
 def build_model():
           model = keras.Sequential([
-            layers.Dense(10, activation='softmax', input_shape=[len(train_dataset.keys())],bias_initializer='zeros'),
-            layers.Dense(10, activation='softmax',bias_initializer='zeros'),
+            layers.Dense(6, activation='softmax', input_shape=[len(train_dataset.keys())],bias_initializer='zeros'),
+            # layers.Dense(10, activation='softmax',bias_initializer='zeros'),
             layers.Dense(1,bias_initializer='zeros')
           ])
         
@@ -374,6 +374,9 @@ plt.xlim([0, 800])
 plt.ylim([0, 1])
 plt.legend()
 
+# act = invtransform(data6_labels)
+# pre = invtransform(data6_pred)
+
 plt.figure(4)
 plt.plot(Time1,invtransform(data3_labels),label='Exact')
 plt.plot(Time1,invtransform(data3_pred),label='DNN')
@@ -409,6 +412,19 @@ plt.ylabel('Functionality')
 plt.xlim([4, 800])
 plt.ylim([0, 1])
 plt.legend()
+
+##
+
+# dat = pd.DataFrame(Time1,columns=['Time'])
+# Dis_tim = Kij(IM=0.95,Haz='Eq',time=dat['Time'])
+# A1,A2 = Dis_tim.Time()
+# dat['P1'] = A1.reshape(len(dat['Time']),1)
+# dat['P2'] = A2.reshape(len(dat['Time']),1)
+# dat['P1'] = transform(dat['P1'])
+# dat['P2'] = transform(dat['P2'])
+# dat.pop("Time")
+# normed_dat = norm(dat)
+# dat_pred1 = invtransform(model.predict(normed_dat).flatten())
 
 # dataset_path1 = '/Users/som/Dropbox/Complex_systems_RNN/Data/DL_verify_EQ_0_7.csv'
 # data1 = pd.read_csv(dataset_path1)
