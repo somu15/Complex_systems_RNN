@@ -261,20 +261,20 @@ class ML_TF:
         # random.set_seed(seed)
 
         def norm(X1,dim):
-            K = np.zeros((len(X1),dim))
-            for ii in np.arange(0,dim,1):
-                K[:,ii] = np.reshape((X1[:,ii]-np.mean(X1[:,ii]))/(np.std(X1[:,ii])),len(X1))
-            return K
+            # K = np.zeros((len(X1),dim))
+            # for ii in np.arange(0,dim,1):
+            #     K[:,ii] = np.reshape((X1[:,ii]-np.mean(X1[:,ii]))/(np.std(X1[:,ii])),len(X1))
+            return X1 # K
 
         normed_obs_ind = norm(self.obs_ind, dim)
         normed_obs = norm(self.obs.reshape(len(self.obs),1), 1)
 
         def build_model():
           model = keras.Sequential([
-            layers.Dense(neurons1, activation='sigmoid', bias_initializer='zeros', kernel_regularizer='l2'), # 'softmax' 'relu' 'tanh'
-            layers.Dense(neurons1, activation='sigmoid', bias_initializer='zeros', kernel_regularizer='l2'), # input_shape=[len(train_dataset.keys())],
-            layers.Dense(neurons2, activation='sigmoid',bias_initializer='zeros', kernel_regularizer='l2'),
-            layers.Dense(1, activation='sigmoid',bias_initializer='zeros')
+            layers.Dense(neurons1, activation='tanh', bias_initializer='zeros', kernel_regularizer='l2'), # 'softmax' 'relu' 'sigmoid'
+            layers.Dense(neurons1, activation='tanh', bias_initializer='zeros', kernel_regularizer='l2'), # input_shape=[len(train_dataset.keys())],
+            layers.Dense(neurons2, activation='tanh',bias_initializer='zeros', kernel_regularizer='l2'),
+            layers.Dense(1, activation='tanh',bias_initializer='zeros')
           ])
 
           # optimizer = tf.keras.optimizers.RMSprop(0.001)
@@ -282,7 +282,7 @@ class ML_TF:
 
           model.compile(loss='mse',
                         optimizer=optimizer,
-                        metrics=['mae', 'mse']) # tf.keras.losses.KLDivergence() tf.keras.losses.Poisson()  tf.keras.losses.BinaryCrossentropy(from_logits=False)
+                        metrics=['mae', 'mse']) # tf.keras.losses.KLDivergence() tf.keras.losses.Poisson() tf.keras.losses.BinaryCrossentropy(from_logits=False)
           return model
 
         model = build_model()
@@ -302,16 +302,16 @@ class ML_TF:
     def DNN_pred(self, ref_ind=None, ref_obs=None, model=None, dim=None, pred_ind=None):
 
         def norm(X1,dim,ref):
-            K = np.zeros((len(X1),dim))
-            for ii in np.arange(0,dim,1):
-                K[:,ii] = np.reshape((X1[:,ii]-np.mean(ref[:,ii]))/(np.std(ref[:,ii])),len(X1))
-            return K
+            # K = np.zeros((len(X1),dim))
+            # for ii in np.arange(0,dim,1):
+            #     K[:,ii] = np.reshape((X1[:,ii]-np.mean(ref[:,ii]))/(np.std(ref[:,ii])),len(X1))
+            return X1 # K
 
         def invnorm(X1, ref):
             # K = np.zeros((len(X1),dim))
             # for ii in np.arange(0,dim,1):
             #     K[:,ii] = (X1[:,ii] * (np.std(X1[:,ii])),len(X1))+np.mean(X1[:,ii])
-            return (X1[:,0] * (np.std(ref[:,0])),len(X1))+np.mean(ref[:,0])
+            return X1 # (X1[:,0] * (np.std(ref[:,0])),len(X1))+np.mean(ref[:,0])
 
         normed_pred_ind = norm(pred_ind, dim, ref_ind)
 

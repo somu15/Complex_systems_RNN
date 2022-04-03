@@ -30,7 +30,7 @@ tf.enable_v2_behavior()
 from ML_TF import ML_TF
 from pyDOE import *
 
-dataset_path = '/Users/som/Dropbox/Complex_systems_RNN/Kriging_based/train_EQ1.csv'
+dataset_path = '/Users/dhulls/projects/Resilience_LDRD/Complex_systems_RNN/Kriging_based/train_EQ1.csv'
 t = []
 p1 = []
 p2 = []
@@ -51,113 +51,87 @@ p1 = np.array(p1,dtype=np.float64)
 p2 = np.array(p2,dtype=np.float64)
 rec = np.array(rec,dtype=np.float64)
 
-def Norm1(X):
-    return X/1000
+def Norm1(X1,X,dim):
+    K = np.zeros((len(X1),dim))
+    for ii in np.arange(0,dim,1):
+        K[:,ii] = np.reshape(((X1[:,ii])-np.mean((X[:,ii])))/(np.std((X[:,ii]))),len(X1))
+    return K
 
-def InvNorm1(X):
-    return X*1000
+def Norm2(X1,X):
+    return ((X1)-np.mean((X)))/(np.std((X)))
 
-# dataset = pd.read_csv(dataset_path)
-# dataset.pop("IM")
-# dataset.pop("Time")
+# def InvNorm1(X1,X):
+#     return X1 # (X1*np.std(X,axis=0)+np.mean(X,axis=0))
 
-# a1 = 1.0
-# b1 = 1.0
-# loc1 = 0
-# sca1 = 1
+def InvNorm2(X1,X):
+    return np.exp(X1*np.std((X))+np.mean((X)))
 
-# def transform(Rec):
-#     # return -np.log(1/Rec-1)
-#     return norm.ppf(Rec)
-    
 
-# def invtransform(x):
-#     # return 1/(1+np.exp(-x))
-#     return norm.cdf(x)
+def Norm3(X1,X):
+    return ((X1)-np.mean((X)))/(np.std((X)))
 
-# dataset = dataset.astype('float32')
+def InvNorm3(X1,X):
+    return (X1*np.std((X))+np.mean((X)))
 
-# dataset['Rec'] = transform(dataset['Rec'])
+def logist(X):
+    return (1/(1+np.exp(-X)))
 
-# dataset['P1'] = transform(dataset['P1'])
+def invlogist(X):
+    return (-np.log(1/X-1))
 
-# dataset['P2'] = transform(dataset['P2'])
+# k1 = np.zeros((len(p1),3))
+# k1[:,0] = t
+# k1[:,1] = p1 # invlogist(p1)
+# k1[:,2] = p2 # invlogist(p2)
+Ndim = 2
+k1 = np.zeros((len(p1),Ndim))
+# k1[:,0] = t
+k1[:,0] = p1 # invlogist(p1)
+k1[:,1] = p2 # invlogist(p2)
+k2 = rec
+# k2[np.where(k2==1.)] = 0.9999
+# k2[np.where(k2==0.)] = 0.0001
+# k2 = invlogist(k2)
 
-# dataset.tail()
+######### Gaussian Process #############
 
-# # Generate a KDE from the empirical sample
-# sample_pdf = scipy.stats.gaussian_kde(np.array(dataset['Rec']))
+# ML = ML_TF(obs_ind = Norm1(k1,k1,Ndim), obs = Norm3(k2,k2))
+# amp1, len1 = ML.GP_train_kernel(num_iters = 1000, amp_init = 1., len_init = np.array([1.,1.,1.]))
 
-# # Sample new datapoints from the KDE
-# new_sample_data = sample_pdf.resample(10000).T[:,0]
+# dataset_path1 = '/Users/dhulls/projects/Resilience_LDRD/Complex_systems_RNN/Kriging_based/test_EQ_0_7_1.csv'
+# t_t = []
+# p1_t = []
+# p2_t = []
+# rec_t = []
+# with open(dataset_path1, 'r') as file:
+#     reader = csv.reader(file)
+#     count=0
+#     for row in reader:
+#         if count>0:
+#             t_t.append(float(row[0]))
+#             p1_t.append(float(row[1]))
+#             p2_t.append(float(row[2]))
+#             rec_t.append(float(row[3]))
+#         count=count+1
 
-# Split the data into train and test
+# t_t = np.array(t_t,dtype=np.float64)
+# p1_t = np.array(p1_t,dtype=np.float64)
+# p2_t = np.array(p2_t,dtype=np.float64)
+# rec_t = np.array(rec_t,dtype=np.float64)
+# k1_t = np.zeros((len(p1_t),Ndim))
+# k1_t[:,0] = t_t
+# k1_t[:,1] = p1_t
+# k1_t[:,2] = p2_t
+# samples1 = ML.GP_predict_kernel(amplitude_var = amp1, length_scale_var=len1, pred_ind = Norm1(k1_t,k1,Ndim), num_samples=500)
+# data1_pred = InvNorm3(np.mean(np.array(samples1),axis=0),rec)
+# data1_std = np.std(InvNorm3(np.array(samples1),rec),axis=0)
 
-# train_dataset = dataset.sample(frac=1.0,random_state=100)
-# test_dataset = dataset.drop(train_dataset.index)
+############# Deep Neural Network #############
 
-# # Inspect the data
+ML = ML_TF(obs_ind = k1, obs = k2)
+DNN_model = ML.DNN_train(dim=Ndim, seed=100, neurons1=20, neurons2=20, learning_rate=0.002, epochs=5000)
 
-# # sns.pairplot(train_dataset[["Rec", "P1", "P2", "Time"]], diag_kind="kde")
-# # sns.pairplot(train_dataset[["Rec", "IM"]], diag_kind="kde")
-
-# train_stats = train_dataset.describe()
-# train_stats.pop("Rec")
-# train_stats = train_stats.transpose()
-# train_stats
-
-# # Split features from labels
-
-# train_labels = train_dataset.pop('Rec')
-# test_labels = test_dataset.pop('Rec')
-
-# # Normalize the data
-
-# def norm1(x):
-#   # return (x - train_stats['mean']) / train_stats['std']
-#   return x
-# normed_train_data = norm1(train_dataset)
-# normed_test_data = norm1(test_dataset)
-
-# k1 = np.array(normed_train_data, dtype=np.float64)
-# k2 = np.array(train_labels, dtype=np.float64)
-# indreq = np.where(train_labels!=np.inf)
-# k2 = k2[indreq]
-# k1 = k1[indreq,:]
-# indreq = np.where(train_labels==-np.inf)
-# k2[indreq] = -12
-
-k1 = np.zeros((len(p1),3))
-k1[:,0] = t
-k1[:,1] = p1
-k1[:,2] = p2
-ML = ML_TF(obs_ind = (k1), obs = (rec))
-amp1, len1 = ML.GP_train(amp_init=1., len_init=1., num_iters = 1000)
-
-# dataset_path1 = '/Users/som/Dropbox/Complex_systems_RNN/Kriging_based/test_EQ.csv'
-# data1 = pd.read_csv(dataset_path1)
-# # data1["IM"] = np.log(data1["IM"])
-# Time1 = data1.pop("Time")
-# # data1.pop("P1")
-# # data1.pop("P2")
-# data1['Rec'] = transform(data1['Rec'])
-# data1['P1'] = transform(data1['P1'])
-# data1['P2'] = transform(data1['P2'])
-# data1_labels = data1.pop('Rec')
-# normed_data1 = norm1(data1)
-# samples1 = ML.GP_predict(amplitude_var = amp1, length_scale_var=len1, pred_ind = normed_data1, num_samples=500)
-# data1_pred = np.mean(np.array(samples1),axis=0)
-
-# plt.figure(2)
-# plt.plot(Time1,invtransform(data1_labels),label='Exact')
-# plt.plot(Time1,invtransform(data1_pred).reshape(1997),label='GP')
-# plt.xlabel('Time [days]')
-# plt.ylabel('Functionality')
-# plt.xlim([0, 300])
-# plt.ylim([0, 1])
-# plt.legend()
-
-dataset_path1 = '/Users/som/Dropbox/Complex_systems_RNN/Kriging_based/test_EQ_0_7_1.csv'
+dataset_path1 = '/Users/dhulls/projects/Resilience_LDRD/Complex_systems_RNN/Kriging_based/test_EQ_0_7_1.csv'
 t_t = []
 p1_t = []
 p2_t = []
@@ -177,9 +151,8 @@ t_t = np.array(t_t,dtype=np.float64)
 p1_t = np.array(p1_t,dtype=np.float64)
 p2_t = np.array(p2_t,dtype=np.float64)
 rec_t = np.array(rec_t,dtype=np.float64)
-k1_t = np.zeros((len(p1_t),3))
-k1_t[:,0] = t_t
-k1_t[:,1] = p1_t
-k1_t[:,2] = p2_t
-samples1 = ML.GP_predict(amplitude_var = amp1, length_scale_var=len1, pred_ind = (k1_t), num_samples=500)
-data1_pred = (np.mean(np.array(samples1),axis=0))
+k1_t = np.zeros((len(p1_t),Ndim))
+# k1_t[:,0] = t_t # 
+k1_t[:,0] = p1_t
+k1_t[:,1] = p2_t
+DNN_pred1 = ML.DNN_pred(k1,k2,DNN_model,Ndim,k1_t)
